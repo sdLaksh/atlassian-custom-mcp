@@ -1,0 +1,17 @@
+{
+  "name": "atlassian-custom-mcp",
+  "version": "1.0.0",
+  "description": "Minimal MCP server for Confluence",
+  "main": "mcp-server-stdio.js",
+  "scripts": {
+    "start": "node mcp-server-stdio.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.13.1",
+    "dotenv": "^16.3.1",
+    "node-fetch": "^2.6.7"
+  },
+  "keywords": ["mcp", "atlassian", "confluence"],
+  "author": "Lakshaya Sood",
+  "license": "MIT"
+}
