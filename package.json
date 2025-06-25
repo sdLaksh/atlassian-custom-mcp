@@ -1,17 +1,27 @@
 {
   "name": "atlassian-custom-mcp",
   "version": "1.0.0",
-  "description": "Minimal MCP server for Confluence",
+  "description": "Enhanced MCP server for Confluence with complete asset download capabilities",
   "main": "mcp-server-stdio.js",
   "scripts": {
-    "start": "node mcp-server-stdio.js"
+    "start": "node mcp-server-stdio.js",
+    "test": "node test-enhanced-server.js",
+    "download": "node download-with-assets.js"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.13.1",
+    "diff": "^5.2.0",
     "dotenv": "^16.3.1",
     "node-fetch": "^2.6.7"
   },
-  "keywords": ["mcp", "atlassian", "confluence"],
+  "keywords": [
+    "mcp",
+    "atlassian",
+    "confluence",
+    "assets",
+    "download",
+    "backup"
+  ],
   "author": "Lakshaya Sood",
   "license": "MIT"
 }

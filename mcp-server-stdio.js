@@ -8,6 +8,7 @@ const {
   ListToolsRequestSchema,
 } = require('@modelcontextprotocol/sdk/types.js');
 const fetch = require('node-fetch');
+const { diffLines, applyPatch, createPatch } = require('diff');
 
 console.error('🔧 Starting Confluence MCP Server (stdio)...');
 console.error(`📁 Working directory: ${process.cwd()}`);
@@ -185,6 +186,223 @@ async function handleConfluenceUpdatePage(pageId, title, content) {
   return await response.json();
 }
 
+// Helper function to calculate content differences
+function calculateContentDiff(originalContent, newContent) {
+  const diff = diffLines(originalContent, newContent);
+  
+  let hasChanges = false;
+  let addedLines = 0;
+  let removedLines = 0;
+  
+  for (const part of diff) {
+    if (part.added) {
+      hasChanges = true;
+      addedLines += part.count || 0;
+    } else if (part.removed) {
+      hasChanges = true;
+      removedLines += part.count || 0;
+    }
+  }
+  
+  return {
+    hasChanges,
+    addedLines,
+    removedLines,
+    diff,
+    changesSummary: hasChanges ? `+${addedLines} -${removedLines} lines` : 'No changes'
+  };
+}
+
+async function handleConfluencePatchUpdate(pageId, title, newContent, originalVersion = null, forceUpdate = false) {
+  const sanitizedPageId = validateInput(pageId, 'Page ID');
+  const sanitizedTitle = validateInput(title, 'Title');
+  const sanitizedNewContent = validateInput(newContent, 'New content');
+  
+  console.error(`🔍 Analyzing changes for page: ${sanitizedPageId}`);
+  
+  // Get the current page state
+  const currentPage = await handleConfluenceGetPage(sanitizedPageId);
+  const currentVersion = currentPage.version.number;
+  const currentContent = currentPage.body?.storage?.value || '';
+  
+  // Check if page has been modified since our original version
+  if (originalVersion && originalVersion !== currentVersion && !forceUpdate) {
+    console.error(`⚠️ Page has been modified! Original: v${originalVersion}, Current: v${currentVersion}`);
+    
+    // Calculate what changed between versions
+    const ourChanges = calculateContentDiff(currentContent, sanitizedNewContent);
+    
+    if (!ourChanges.hasChanges) {
+      console.error(`✅ No changes needed - content is already up to date`);
+      return {
+        ...currentPage,
+        updateStatus: 'no-changes',
+        message: 'Content is already up to date'
+      };
+    }
+    
+    return {
+      ...currentPage,
+      updateStatus: 'conflict-detected',
+      message: `Page was modified by someone else (v${originalVersion} → v${currentVersion}). Use forceUpdate: true to override.`,
+      conflictDetails: {
+        originalVersion,
+        currentVersion,
+        ourChanges: ourChanges.changesSummary,
+        requiresPermission: true
+      }
+    };
+  }
+  
+  // Calculate differences
+  const changes = calculateContentDiff(currentContent, sanitizedNewContent);
+  
+  if (!changes.hasChanges) {
+    console.error(`✅ No changes needed - content is identical`);
+    return {
+      ...currentPage,
+      updateStatus: 'no-changes',
+      message: 'Content is already up to date'
+    };
+  }
+  
+  console.error(`📝 Changes detected: ${changes.changesSummary}`);
+  
+  // Proceed with the update
+  const url = `${process.env.CONFLUENCE_URL}/wiki/rest/api/content/${sanitizedPageId}`;
+  const body = {
+    id: sanitizedPageId,
+    type: "page",
+    title: sanitizedTitle,
+    version: {
+      number: currentVersion + 1
+    },
+    body: {
+      storage: {
+        value: sanitizedNewContent,
+        representation: "storage"
+      }
+    }
+  };
+  
+  const response = await fetch(url, {
+    method: 'PUT',
+    headers: getConfluenceHeaders(),
+    body: JSON.stringify(body)
+  });
+  
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error('Confluence API error:', response.status, errorText);
+    throw new Error(`Confluence API error: ${response.status} ${response.statusText}`);
+  }
+  
+  const result = await response.json();
+  
+  return {
+    ...result,
+    updateStatus: 'success',
+    changes: changes.changesSummary,
+    patchInfo: {
+      addedLines: changes.addedLines,
+      removedLines: changes.removedLines,
+      originalVersion: currentVersion,
+      newVersion: currentVersion + 1
+    }
+  };
+}
+
+async function handleConfluenceGetAttachments(pageId) {
+  const sanitizedPageId = validateInput(pageId, 'Page ID');
+  const url = `${process.env.CONFLUENCE_URL}/wiki/rest/api/content/${sanitizedPageId}/child/attachment`;
+  
+  console.error(`📎 Fetching attachments for page: ${sanitizedPageId}`);
+  
+  const response = await fetch(url, {
+    method: 'GET',
+    headers: getConfluenceHeaders()
+  });
+  
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error('Confluence API error:', response.status, errorText);
+    throw new Error(`Confluence API error: ${response.status} ${response.statusText}`);
+  }
+  
+  return await response.json();
+}
+
+async function handleConfluenceDownloadAttachment(attachmentId, filename) {
+  const sanitizedAttachmentId = validateInput(attachmentId, 'Attachment ID');
+  const sanitizedFilename = validateInput(filename, 'Filename');
+  
+  console.error(`⬇️ Downloading attachment: ${sanitizedFilename} (${sanitizedAttachmentId})`);
+  
+  const url = `${process.env.CONFLUENCE_URL}/wiki/rest/api/content/${sanitizedAttachmentId}/download`;
+  
+  const response = await fetch(url, {
+    method: 'GET',
+    headers: getConfluenceHeaders()
+  });
+  
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error('Confluence API error:', response.status, errorText);
+    throw new Error(`Confluence API error: ${response.status} ${response.statusText}`);
+  }
+  
+  // Convert response to base64 for transport
+  const buffer = await response.buffer();
+  const base64Data = buffer.toString('base64');
+  
+  return {
+    filename: sanitizedFilename,
+    contentType: response.headers.get('content-type'),
+    size: buffer.length,
+    data: base64Data
+  };
+}
+
+async function handleConfluenceGetPageWithAttachments(pageId, downloadAttachments = false) {
+  const sanitizedPageId = validateInput(pageId, 'Page ID');
+  
+  // Get the page content
+  const page = await handleConfluenceGetPage(sanitizedPageId);
+  
+  // Get attachments list
+  const attachments = await handleConfluenceGetAttachments(sanitizedPageId);
+  
+  // If downloadAttachments is true, download each attachment
+  if (downloadAttachments && attachments.results && attachments.results.length > 0) {
+    console.error(`📦 Downloading ${attachments.results.length} attachments...`);
+    
+    const downloadedAttachments = [];
+    for (const attachment of attachments.results) {
+      try {
+        const downloadedAttachment = await handleConfluenceDownloadAttachment(
+          attachment.id, 
+          attachment.title
+        );
+        downloadedAttachments.push(downloadedAttachment);
+      } catch (error) {
+        console.error(`Failed to download attachment ${attachment.title}:`, error.message);
+        // Continue with other attachments
+      }
+    }
+    
+    return {
+      ...page,
+      attachments: attachments.results,
+      downloadedAttachments
+    };
+  }
+  
+  return {
+    ...page,
+    attachments: attachments.results
+  };
+}
+
 // Create the server
 const server = new Server(
   {
@@ -254,7 +472,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       },
       {
         name: "confluence_update_page",
-        description: "Update an existing Confluence page",
+        description: "Update an existing Confluence page (replaces entire content)",
         inputSchema: {
           type: "object",
           properties: {
@@ -272,6 +490,88 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
             }
           },
           required: ["pageId", "title", "content"]
+        }
+      },
+      {
+        name: "confluence_patch_update",
+        description: "Smart patch-based update that detects conflicts and calculates diffs",
+        inputSchema: {
+          type: "object",
+          properties: {
+            pageId: {
+              type: "string",
+              description: "The ID of the page to update"
+            },
+            title: {
+              type: "string",
+              description: "The new title of the page"
+            },
+            content: {
+              type: "string",
+              description: "The new HTML content of the page"
+            },
+            originalVersion: {
+              type: "number",
+              description: "The version number you started editing from (for conflict detection)"
+            },
+            forceUpdate: {
+              type: "boolean",
+              description: "Force update even if conflicts are detected (default: false)",
+              default: false
+            }
+          },
+          required: ["pageId", "title", "content"]
+        }
+      },
+      {
+        name: "confluence_get_attachments",
+        description: "Get all attachments for a Confluence page",
+        inputSchema: {
+          type: "object",
+          properties: {
+            pageId: {
+              type: "string",
+              description: "The ID of the Confluence page to get attachments from"
+            }
+          },
+          required: ["pageId"]
+        }
+      },
+      {
+        name: "confluence_download_attachment",
+        description: "Download a specific attachment from Confluence",
+        inputSchema: {
+          type: "object",
+          properties: {
+            attachmentId: {
+              type: "string",
+              description: "The ID of the attachment to download"
+            },
+            filename: {
+              type: "string",
+              description: "The filename of the attachment"
+            }
+          },
+          required: ["attachmentId", "filename"]
+        }
+      },
+      {
+        name: "confluence_get_page_with_attachments",
+        description: "Get a Confluence page with all its attachments listed and optionally downloaded",
+        inputSchema: {
+          type: "object",
+          properties: {
+            pageId: {
+              type: "string",
+              description: "The ID of the Confluence page to retrieve"
+            },
+            downloadAttachments: {
+              type: "boolean",
+              description: "Whether to download all attachments (default: false)",
+              default: false
+            }
+          },
+          required: ["pageId"]
         }
       }
     ]
@@ -305,6 +605,31 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         validateInput(args.title, 'Title');
         validateInput(args.content, 'Content');
         result = await handleConfluenceUpdatePage(args.pageId, args.title, args.content);
+        break;
+      case 'confluence_patch_update':
+        validateInput(args.pageId, 'Page ID');
+        validateInput(args.title, 'Title');
+        validateInput(args.content, 'Content');
+        result = await handleConfluencePatchUpdate(
+          args.pageId, 
+          args.title, 
+          args.content, 
+          args.originalVersion,
+          args.forceUpdate || false
+        );
+        break;
+      case 'confluence_get_attachments':
+        validateInput(args.pageId, 'Page ID');
+        result = await handleConfluenceGetAttachments(args.pageId);
+        break;
+      case 'confluence_download_attachment':
+        validateInput(args.attachmentId, 'Attachment ID');
+        validateInput(args.filename, 'Filename');
+        result = await handleConfluenceDownloadAttachment(args.attachmentId, args.filename);
+        break;
+      case 'confluence_get_page_with_attachments':
+        validateInput(args.pageId, 'Page ID');
+        result = await handleConfluenceGetPageWithAttachments(args.pageId, args.downloadAttachments || false);
         break;
       default:
         throw new Error(`Unknown tool: ${name}`);

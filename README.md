@@ -1,73 +1,73 @@
-# Minimal Confluence MCP Server
+# Enhanced Confluence MCP Server
 
-## Setup (3 steps only!)
+A Model Context Protocol (MCP) server for Atlassian Confluence with complete asset download capabilities and smart collaborative editing features.
 
-1. **Install dependencies**:
-   ```bash
-   npm install
-   ```
+## 🚀 Quick Setup
 
-2. **Configure `.env`** (copy from `.env.template`):
-   ```
-   CONFLUENCE_URL=https://your-instance.atlassian.net/
-   ATLASSIAN_USERNAME=your-email@company.com
-   ATLASSIAN_API_TOKEN=your-api-token-here
-   ```
-
-3. **Update VS Code settings** (`~/Library/Application Support/Code/User/settings.json`):
-   ```json
-   "mcp": {
-     "servers": {
-       "atlassian-custom-mcp": {
-         "command": "node",
-         "args": ["/Users/lakshayasood/Downloads/alyne/atlassian-custom-mcp/mcp-server-stdio.js"],
-         "cwd": "/Users/lakshayasood/Downloads/alyne/atlassian-custom-mcp"
-       }
-     }
-   }
-   ```
-
-4. Open the settings.json and run the mcp server using run command
-
-## Test
-
-Restart VS Code completely, then in Copilot Chat:
-```
-@copilot Search confluence for pages containing "documentation"
+### 1. Install Dependencies
+```bash
+npm install
 ```
 
-## Files You Need
-- `mcp-server-stdio.js` - The MCP server
-- `.env` - Your credentials  
-- `package.json` - Dependencies
-- `README.md` - This file
+### 2. Configure Environment
+Copy `.env.template` to `.env` and fill in your details:
+```bash
+cp .env.template .env
+```
+
+Edit `.env`:
+```
+CONFLUENCE_URL=https://your-instance.atlassian.net/
+ATLASSIAN_USERNAME=your-email@company.com
+ATLASSIAN_API_TOKEN=your-api-token-here
+```
+
+### 3. Add to VS Code Settings
+Add to `~/Library/Application Support/Code/User/settings.json`:
+```json
+{
+  "mcp": {
+    "servers": {
+      "atlassian-custom-mcp": {
+        "command": "node",
+        "args": ["/path/to/your/atlassian-custom-mcp/mcp-server-stdio.js"],
+        "cwd": "/path/to/your/atlassian-custom-mcp"
+      }
+    }
+  }
+}
+```
+
+### 4. Restart VS Code & Test
+```
+@copilot Search confluence for "documentation"
+```
+
+## 🔑 Get Your API Token
+
+1. Visit: [https://id.atlassian.com/manage-profile/security/api-tokens](https://id.atlassian.com/manage-profile/security/api-tokens)
+2. Create new token with label "VS Code Confluence MCP"
+3. Copy token immediately (shown only once)
+4. Add to `.env` file
+5. Keep secure - never commit to version control
+
+## 🧪 Verify Installation
+
+```bash
+npm test
+```
+
+Safe test with mocked API calls - no real Confluence requests.
+
+## 📚 Complete Documentation
+
+**➡️ [USAGE_GUIDE.md](./USAGE_GUIDE.md)** - Complete usage guide with examples, prompts, and all features
+
+**➡️ [PATCH_UPDATE_GUIDE.md](./PATCH_UPDATE_GUIDE.md)** - Safe collaborative editing strategies
+
+---
+
+**✨ Ready!** See the usage guide for all features and examples.
 
 
-
-## How to Generate Atlassian API Token
-
-1. **Go to Atlassian Account Settings**:
-   Visit [https://id.atlassian.com/manage-profile/security/api-tokens](https://id.atlassian.com/manage-profile/security/api-tokens)
-
-2. **Create API Token**:
-   - Click "Create API token"
-   - Give it a descriptive label (e.g., "VS Code Confluence MCP")
-   - Click "Create"
-
-3. **Copy the Token**:
-   - Copy the generated token immediately (it won't be shown again)
-   - Paste it into your `.env` file as `ATLASSIAN_API_TOKEN`
-
-4. **Keep it Secure**:
-   - Never share your API token
-   - Never commit it to version control
-   - Rotate tokens regularly for security
-
-## How to Extend
-
-Want to add new Confluence features? Use Copilot to help you:
-
-1. **Open this repo in VS Code**
-2. **Open Copilot Chat in agent mode**
-3. **Use the `@workspace` command** to ask for specific API changes you need:
 
