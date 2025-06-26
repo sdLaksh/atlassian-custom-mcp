@@ -282,23 +282,41 @@ async function main() {
   console.log('🔒 ALL TESTS USE MOCKS - NO REAL API CALLS WILL BE MADE');
   console.log('='.repeat(60));
   
-  const serverTest = await testEnhancedServerWithMocks();
-  const downloadTest = await testDownloadScriptWithMocks();
-  const validationTest = await testInputValidation();
-  
-  console.log('\n' + '='.repeat(60));
-  if (serverTest && downloadTest && validationTest) {
-    console.log('🎉 All tests passed! Your enhanced MCP server is ready.');
-    console.log('\n✅ Comprehensive Testing Complete:');
-    console.log('   🔒 Zero impact on real Confluence instance');
-    console.log('   🧪 All functionality validated with mocks');
-    console.log('   🛡️ Security validations passed');
-    console.log('   📦 Asset download capabilities confirmed');
-    console.log('   🔧 Patch update system validated');
-    console.log('\n📖 See USAGE_GUIDE.md for detailed usage instructions.');
-  } else {
-    console.log('⚠️ Some tests failed. Please check the issues above.');
+  // Set a timeout to prevent hanging
+  const timeout = setTimeout(() => {
+    console.log('\n⏰ Test timeout reached. Forcing exit...');
     process.exit(1);
+  }, 30000); // 30 second timeout
+  
+  try {
+    const serverTest = await testEnhancedServerWithMocks();
+    const downloadTest = await testDownloadScriptWithMocks();
+    const validationTest = await testInputValidation();
+    
+    // Clear timeout since tests completed
+    clearTimeout(timeout);
+    
+    console.log('\n' + '='.repeat(60));
+    if (serverTest && downloadTest && validationTest) {
+      console.log('🎉 All tests passed! Your enhanced MCP server is ready.');
+      console.log('\n✅ Comprehensive Testing Complete:');
+      console.log('   🔒 Zero impact on real Confluence instance');
+      console.log('   🧪 All functionality validated with mocks');
+      console.log('   🛡️ Security validations passed');
+      console.log('   📦 Asset download capabilities confirmed');
+      console.log('   🔧 Patch update system validated');
+      console.log('\n📖 See USAGE_GUIDE.md for detailed usage instructions.');
+      
+      // Clean exit - force process termination
+      console.log('\n🏁 Test suite completed successfully. Exiting...');
+      process.exit(0);
+    } else {
+      console.log('⚠️ Some tests failed. Please check the issues above.');
+      process.exit(1);
+    }
+  } catch (error) {
+    clearTimeout(timeout);
+    throw error;
   }
 }
 
