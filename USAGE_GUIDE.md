@@ -39,13 +39,19 @@ A comprehensive guide for using the enhanced Confluence MCP server with complete
 @copilot Show me the details of confluence page 123456789
 ```
 
-### 📎 **Asset Management**
+### 📎 **Complete Asset Management & Export**
 ```
-@copilot Get confluence page 123456789 with all attachments downloaded
-@copilot List all attachments on page 123456789 without downloading
-@copilot Download specific attachment att987654321 as screenshot.png
-@copilot Export confluence page with assets to new file
-@copilot Download page tree with all child pages and attachments
+@copilot Download confluence page 123456789 with all attachments and save as Markdown
+@copilot Export confluence page tree starting from 123456789 with all images embedded
+@copilot Download complete confluence space backup with all assets to confluence_content folder
+@copilot Get confluence page with images properly embedded in Markdown format
+```
+
+### 🌳 **Hierarchical Downloads**
+```
+@copilot Download page tree with all child pages and attachments from confluence
+@copilot Export entire confluence space starting from page 123456789
+@copilot Download confluence folder structure with all related pages and images
 ```
 
 ### ✏️ **Page Creation**
@@ -69,21 +75,27 @@ A comprehensive guide for using the enhanced Confluence MCP server with complete
 
 ### 🌳 **Bulk & Export Operations**
 ```
-@copilot Export confluence page hierarchy starting from 123456789
-@copilot Download complete confluence space backup with all assets
-@copilot Batch download multiple pages with their attachments
+@copilot Export confluence page hierarchy starting from 123456789 to confluence_content folder
+@copilot Download complete confluence space backup with embedded images
+@copilot Batch download multiple pages with their attachments as Markdown files
+@copilot Create self-contained documentation export from confluence
 ```
 
 ## 🚀 Quick Examples
 
-### 1. Download Complete Page with Assets
+### 1. Download Complete Page with Assets as Markdown
 ```bash
-node download-with-assets.js 123456789
+node download-with-assets.js 123456789 ./confluence_content
 ```
 
-### 2. Export Page Hierarchy
+### 2. Export Complete Page Hierarchy
 ```bash
-node download-with-assets.js 123456789 ./export hierarchy
+node download-with-assets.js 123456789 ./confluence_content hierarchy
+```
+
+### 3. Perfect Prompt for Complete Export
+```
+@copilot Download page tree with all child pages and attachments from confluence page 123456789 to confluence_content folder. Create Markdown files with embedded images referencing attachments/ folder. Make it a complete self-contained export.
 ```
 
 ## � Asset Download Features
@@ -122,17 +134,27 @@ node download-with-assets.js 123456789 ./export hierarchy
 
 ## 📁 Output Structure
 
-When downloading pages with assets:
+When downloading pages with assets using the enhanced export:
 
 ```
-downloads/
-├── Page_Title.html          # Main page content
-├── assets/                  # All images and attachments
+confluence_content/
+├── README.md                          # Export overview and index
+├── attachments/                       # All images and files (shared)
 │   ├── screenshot1.png
 │   ├── document.pdf
 │   └── diagram.jpg
-└── manifest.json           # Download metadata
+├── Email_Digest_Folder_123456789.md   # Main page content
+├── Technical_Design_987654321.md      # Child page content  
+├── Deploy_Guide_456789123.md          # Another page content
+└── hierarchy.json                     # Complete export metadata
 ```
+
+### Key Features:
+- **Markdown Format**: All pages saved as readable Markdown files
+- **Embedded Images**: Images properly referenced using `![image.png](attachments/image.png)`
+- **Shared Attachments**: Single `attachments/` folder for all images/files
+- **Self-Contained**: No external dependencies, works offline
+- **Complete Metadata**: Page IDs, versions, space info preserved
 
 ## 🎯 Common Use Cases
 

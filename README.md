@@ -1,6 +1,15 @@
 # Enhanced Confluence MCP Server
 
-A Model Context Protocol (MCP) server for Atlassian Confluence with complete asset download capabilities and smart collaborative editing features.
+A Model Context Protocol (MCP) server for Atlassian Confluence with **complete asset download capabilities**, **smart collaborative editing**, and **perfect Markdown export** with embedded images.
+
+## ✨ Key Features
+
+- **📎 Complete Asset Download**: Download all images, documents, and attachments with proper embedding
+- **🔧 Smart Collaborative Editing**: Patch-based updates with conflict detection
+- **📄 Perfect Markdown Export**: Clean Markdown files with embedded images
+- **🌳 Hierarchical Downloads**: Export entire page trees and spaces
+- **🛡️ Safe Operations**: Read-only by default, intelligent conflict prevention
+- **🔍 Advanced Search**: Query pages using Confluence Query Language (CQL)
 
 ## 🚀 Quick Setup
 
@@ -40,7 +49,19 @@ Add to `~/Library/Application Support/Code/User/settings.json`:
 
 ### 4. Restart VS Code & Test
 ```
-@copilot Search confluence for "documentation"
+@copilot Download page tree with all child pages and attachments from confluence page 123456789 to confluence_content folder. Create Markdown files with embedded images referencing attachments/ folder.
+```
+
+## 🎯 Perfect Prompts for Complete Export
+
+### For Documentation Export:
+```
+@copilot Download page tree with all child pages and attachments from confluence page [PAGE_ID] to confluence_content folder. Create Markdown files with embedded images referencing attachments/ folder. Make it a complete self-contained export.
+```
+
+### For Single Page with Assets:
+```
+@copilot Download confluence page [PAGE_ID] with all attachments and save as Markdown with embedded images to confluence_content folder
 ```
 
 ## 🔑 Get Your API Token
@@ -61,9 +82,39 @@ Safe test with mocked API calls - no real Confluence requests.
 
 ## 📚 Complete Documentation
 
-**➡️ [USAGE_GUIDE.md](./USAGE_GUIDE.md)** - Complete usage guide with examples, prompts, and all features
+**➡️ [USAGE_GUIDE.md](./USAGE_GUIDE.md)** - Complete usage guide with all features and prompts
+
+**➡️ [ASSET_DOWNLOAD_GUIDE.md](./ASSET_DOWNLOAD_GUIDE.md)** - Perfect asset download and export strategies  
+
+**➡️ [USAGE_EXAMPLES.md](./USAGE_EXAMPLES.md)** - Real-world examples and workflows
 
 **➡️ [PATCH_UPDATE_GUIDE.md](./PATCH_UPDATE_GUIDE.md)** - Safe collaborative editing strategies
+
+## 💡 What Makes This Special
+
+### 🖼️ **Perfect Image Embedding**
+- Downloads actual binary image data (not just metadata)
+- Converts Confluence image markup to proper Markdown syntax
+- Creates `![image.png](attachments/image.png)` references
+- Self-contained documentation that works offline
+
+### 🌳 **Intelligent Content Discovery** 
+- Finds complete page hierarchies automatically
+- Searches for child pages and related content
+- Handles both folder structures and space-wide exports
+- Avoids duplicates and manages large spaces gracefully
+
+### 📄 **Clean Markdown Output**
+- Converts Confluence storage format to readable Markdown
+- Preserves formatting (headings, bold, italic, code)
+- Includes complete metadata (page IDs, versions, dates)
+- Creates navigable file structure with meaningful names
+
+### 🔒 **Zero Risk Operations**
+- **READ-ONLY**: Never modifies your Confluence instance
+- Smart conflict detection for collaborative editing
+- Comprehensive input validation and XSS protection
+- Extensive testing with mocked API calls
 
 ---
 

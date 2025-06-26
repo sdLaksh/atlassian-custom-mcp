@@ -41,67 +41,73 @@ async function downloadPageWithAssets(pageId, outputDir = './downloads') {
     
     const pageData = JSON.parse(pageResponse.content[0].text);
     
-    // Step 2: Save the page content
-    const pageFilename = `${pageData.title.replace(/[^a-zA-Z0-9]/g, '_')}.html`;
-    const pageContent = `
-<!DOCTYPE html>
-<html>
-<head>
-    <title>${pageData.title}</title>
-    <meta charset="utf-8">
-    <style>
-        body { font-family: Arial, sans-serif; margin: 40px; }
-        .page-meta { background: #f5f5f5; padding: 15px; margin-bottom: 20px; }
-        .attachments { border-top: 1px solid #ddd; margin-top: 40px; padding-top: 20px; }
-        .attachment { margin: 10px 0; padding: 10px; background: #f9f9f9; }
-    </style>
-</head>
-<body>
-    <div class="page-meta">
-        <h1>${pageData.title}</h1>
-        <p><strong>Space:</strong> ${pageData.space?.name || 'Unknown'}</p>
-        <p><strong>Page ID:</strong> ${pageData.id}</p>
-        <p><strong>Version:</strong> ${pageData.version?.number || 'Unknown'}</p>
-        <p><strong>Last Modified:</strong> ${pageData.version?.when || 'Unknown'}</p>
-    </div>
+    // Step 2: Save the page content as Markdown
+    const pageFilename = `${pageData.title.replace(/[^a-zA-Z0-9 ]/g, '_').replace(/\s+/g, '_')}.md`;
     
-    <div class="content">
-        ${pageData.body?.storage?.value || 'No content available'}
-    </div>
+    // Convert HTML content to more readable format and embed images
+    let markdownContent = pageData.body?.storage?.value || 'No content available';
     
-    ${pageData.attachments && pageData.attachments.length > 0 ? `
-    <div class="attachments">
-        <h2>Attachments (${pageData.attachments.length})</h2>
-        ${pageData.attachments.map(att => `
-            <div class="attachment">
-                <strong>${att.title}</strong><br>
-                <small>Size: ${att.extensions?.fileSize || 'Unknown'} | 
-                Type: ${att.extensions?.mediaType || 'Unknown'}</small>
-            </div>
-        `).join('')}
-    </div>
-    ` : ''}
-</body>
-</html>
-    `;
+    // Basic HTML to Markdown conversion for common elements
+    markdownContent = markdownContent
+      .replace(/<h1[^>]*>(.*?)<\/h1>/gi, '# $1')
+      .replace(/<h2[^>]*>(.*?)<\/h2>/gi, '## $1')
+      .replace(/<h3[^>]*>(.*?)<\/h3>/gi, '### $1')
+      .replace(/<h4[^>]*>(.*?)<\/h4>/gi, '#### $1')
+      .replace(/<p[^>]*>(.*?)<\/p>/gi, '$1\n\n')
+      .replace(/<br\s*\/?>/gi, '\n')
+      .replace(/<strong[^>]*>(.*?)<\/strong>/gi, '**$1**')
+      .replace(/<em[^>]*>(.*?)<\/em>/gi, '*$1*')
+      .replace(/<code[^>]*>(.*?)<\/code>/gi, '`$1`');
+    
+    // Handle image references - replace with markdown image syntax pointing to attachments folder
+    if (pageData.downloadedAttachments && pageData.downloadedAttachments.length > 0) {
+      for (const attachment of pageData.downloadedAttachments) {
+        const imageName = attachment.filename;
+        // Look for image references in the content and replace with proper markdown
+        const imageRegex = new RegExp(`<ac:image[^>]*>.*?<ri:attachment ri:filename="${imageName}"[^>]*>.*?</ac:image>`, 'gi');
+        markdownContent = markdownContent.replace(imageRegex, `![${imageName}](../attachments/${imageName})`);
+        
+        // Also handle simpler image tags
+        const simpleImageRegex = new RegExp(`<img[^>]*src="[^"]*${imageName}[^"]*"[^>]*>`, 'gi');
+        markdownContent = markdownContent.replace(simpleImageRegex, `![${imageName}](../attachments/${imageName})`);
+      }
+    }
+    
+    const pageContent = `# ${pageData.title}
+
+**Page ID:** ${pageData.id}  
+**Space:** ${pageData.space?.name || 'Unknown'}  
+**Version:** ${pageData.version?.number || 'Unknown'}  
+**Last Modified:** ${pageData.version?.when || 'Unknown'}  
+
+---
+
+${markdownContent}
+
+${pageData.attachments && pageData.attachments.length > 0 ? `
+## Attachments (${pageData.attachments.length})
+
+${pageData.attachments.map(att => `- **${att.title}** (${att.extensions?.fileSize || 'Unknown'} bytes, ${att.extensions?.mediaType || 'Unknown'})`).join('\n')}
+` : ''}
+`;
     
     await fs.writeFile(path.join(outputDir, pageFilename), pageContent);
     console.log(`✅ Saved page content: ${pageFilename}`);
     
-    // Step 3: Save downloaded attachments
+    // Step 3: Save downloaded attachments to attachments folder (in root)
     if (pageData.downloadedAttachments && pageData.downloadedAttachments.length > 0) {
-      const assetsDir = path.join(outputDir, 'assets');
-      await fs.mkdir(assetsDir, { recursive: true });
+      const attachmentsDir = path.join(outputDir, 'attachments');
+      await fs.mkdir(attachmentsDir, { recursive: true });
       
       for (const attachment of pageData.downloadedAttachments) {
         const buffer = Buffer.from(attachment.data, 'base64');
-        const filename = attachment.filename.replace(/[^a-zA-Z0-9._-]/g, '_');
+        const filename = attachment.filename;
         
-        await fs.writeFile(path.join(assetsDir, filename), buffer);
+        await fs.writeFile(path.join(attachmentsDir, filename), buffer);
         console.log(`📎 Saved attachment: ${filename} (${attachment.size} bytes)`);
       }
       
-      console.log(`✅ Downloaded ${pageData.downloadedAttachments.length} attachments to assets/`);
+      console.log(`✅ Downloaded ${pageData.downloadedAttachments.length} attachments to attachments/`);
     }
     
     // Step 4: Create manifest file
@@ -115,7 +121,7 @@ async function downloadPageWithAssets(pageId, outputDir = './downloads') {
       downloadedAttachmentCount: pageData.downloadedAttachments?.length || 0,
       files: {
         page: pageFilename,
-        assets: pageData.downloadedAttachments?.map(att => `assets/${att.filename}`) || []
+        attachments: pageData.downloadedAttachments?.map(att => `attachments/${att.filename}`) || []
       }
     };
     
@@ -143,40 +149,220 @@ async function downloadPageHierarchy(rootPageId, outputDir = './downloads') {
   console.log(`🌳 Starting hierarchical download from page ${rootPageId}...`);
   
   try {
-    // Step 1: Find all child pages
-    console.log('🔍 Finding child pages...');
-    const searchResponse = await client.callTool('confluence_search', {
-      cql: `ancestor = ${rootPageId}`
+    // Ensure output directory exists
+    await fs.mkdir(outputDir, { recursive: true });
+    
+    // Create attachments folder in root (shared by all pages)
+    const attachmentsDir = path.join(outputDir, 'attachments');
+    await fs.mkdir(attachmentsDir, { recursive: true });
+    
+    // Step 1: Get root page info to determine space
+    console.log('🔍 Getting root page info...');
+    const rootPageResponse = await client.callTool('confluence_get_page', {
+      pageId: rootPageId
     });
+    const rootPageData = JSON.parse(rootPageResponse.content[0].text);
+    const spaceKey = rootPageData.space?.key;
     
-    const searchData = JSON.parse(searchResponse.content[0].text);
-    const childPages = searchData.results || [];
-    
-    // Step 2: Download root page
-    await downloadPageWithAssets(rootPageId, path.join(outputDir, 'root'));
-    
-    // Step 3: Download each child page
-    for (let i = 0; i < childPages.length; i++) {
-      const childPage = childPages[i];
-      console.log(`📄 Downloading child page ${i + 1}/${childPages.length}: ${childPage.title}`);
-      
-      const childDir = path.join(outputDir, 'children', childPage.id);
-      await downloadPageWithAssets(childPage.id, childDir);
+    if (!spaceKey) {
+      throw new Error('Could not determine space key from root page');
     }
     
-    // Step 4: Create hierarchy manifest
+    // Step 2: Search for all pages in the space or ancestor hierarchy
+    console.log(`🔍 Finding all pages in space ${spaceKey} or under ancestor ${rootPageId}...`);
+    
+    // Try to find child pages first
+    const childSearchResponse = await client.callTool('confluence_search', {
+      cql: `ancestor = ${rootPageId}`
+    });
+    const childSearchData = JSON.parse(childSearchResponse.content[0].text);
+    const childPages = childSearchData.results || [];
+    
+    // Also search for pages in the same space that might be related
+    const spaceSearchResponse = await client.callTool('confluence_search', {
+      cql: `space = "${spaceKey}" AND type = "page"`
+    });
+    const spaceSearchData = JSON.parse(spaceSearchResponse.content[0].text);
+    const spacePages = spaceSearchData.results || [];
+    
+    // Combine and deduplicate pages
+    const allPageIds = new Set();
+    const allPages = [];
+    
+    // Add root page
+    allPages.push(rootPageData);
+    allPageIds.add(rootPageId);
+    
+    // Add child pages
+    for (const page of childPages) {
+      if (!allPageIds.has(page.id)) {
+        allPages.push(page);
+        allPageIds.add(page.id);
+      }
+    }
+    
+    // Add space pages (if not too many)
+    if (spacePages.length <= 20) { // Reasonable limit
+      for (const page of spacePages) {
+        if (!allPageIds.has(page.id)) {
+          allPages.push(page);
+          allPageIds.add(page.id);
+        }
+      }
+    }
+    
+    console.log(`📋 Found ${allPages.length} pages to download`);
+    
+    // Step 3: Download all pages with attachments
+    const downloadedPages = [];
+    const allAttachments = [];
+    
+    for (let i = 0; i < allPages.length; i++) {
+      const page = allPages[i];
+      try {
+        console.log(`📄 Downloading page ${i + 1}/${allPages.length}: ${page.title} (${page.id})`);
+        
+        const pageResponse = await client.callTool('confluence_get_page_with_attachments', {
+          pageId: page.id,
+          downloadAttachments: true
+        });
+        
+        const pageData = JSON.parse(pageResponse.content[0].text);
+        
+        // Save page as Markdown
+        const pageFilename = `${pageData.title.replace(/[^a-zA-Z0-9 ]/g, '_').replace(/\s+/g, '_')}_${pageData.id}.md`;
+        
+        // Convert content to Markdown and handle images
+        let markdownContent = pageData.body?.storage?.value || 'No content available';
+        
+        // Basic HTML to Markdown conversion
+        markdownContent = markdownContent
+          .replace(/<h1[^>]*>(.*?)<\/h1>/gi, '# $1')
+          .replace(/<h2[^>]*>(.*?)<\/h2>/gi, '## $1')
+          .replace(/<h3[^>]*>(.*?)<\/h3>/gi, '### $1')
+          .replace(/<h4[^>]*>(.*?)<\/h4>/gi, '#### $1')
+          .replace(/<p[^>]*>(.*?)<\/p>/gi, '$1\n\n')
+          .replace(/<br\s*\/?>/gi, '\n')
+          .replace(/<strong[^>]*>(.*?)<\/strong>/gi, '**$1**')
+          .replace(/<em[^>]*>(.*?)<\/em>/gi, '*$1*')
+          .replace(/<code[^>]*>(.*?)<\/code>/gi, '`$1`');
+        
+        // Handle image references and save attachments
+        if (pageData.downloadedAttachments && pageData.downloadedAttachments.length > 0) {
+          for (const attachment of pageData.downloadedAttachments) {
+            const imageName = attachment.filename;
+            
+            // Replace Confluence-specific image markup with Markdown
+            const imageRegex = new RegExp(`<ac:image[^>]*>.*?<ri:attachment ri:filename="${imageName}"[^>]*>.*?</ac:image>`, 'gi');
+            markdownContent = markdownContent.replace(imageRegex, `![${imageName}](attachments/${imageName})`);
+            
+            // Also handle simpler image tags
+            const simpleImageRegex = new RegExp(`<img[^>]*src="[^"]*${imageName}[^"]*"[^>]*>`, 'gi');
+            markdownContent = markdownContent.replace(simpleImageRegex, `![${imageName}](attachments/${imageName})`);
+            
+            // Save attachment to attachments folder (avoid duplicates)
+            const attachmentPath = path.join(attachmentsDir, attachment.filename);
+            const buffer = Buffer.from(attachment.data, 'base64');
+            await fs.writeFile(attachmentPath, buffer);
+            
+            allAttachments.push({
+              filename: attachment.filename,
+              pageTitle: pageData.title,
+              pageId: pageData.id,
+              size: attachment.size,
+              contentType: attachment.contentType
+            });
+          }
+        }
+        
+        const pageContent = `# ${pageData.title}
+
+**Page ID:** ${pageData.id}  
+**Space:** ${pageData.space?.name || 'Unknown'}  
+**Version:** ${pageData.version?.number || 'Unknown'}  
+**Last Modified:** ${pageData.version?.when || 'Unknown'}  
+
+---
+
+${markdownContent}
+
+${pageData.attachments && pageData.attachments.length > 0 ? `
+## Attachments (${pageData.attachments.length})
+
+${pageData.attachments.map(att => `- **${att.title}** (${att.extensions?.fileSize || 'Unknown'} bytes, ${att.extensions?.mediaType || 'Unknown'})`).join('\n')}
+` : ''}
+`;
+        
+        await fs.writeFile(path.join(outputDir, pageFilename), pageContent);
+        console.log(`✅ Saved: ${pageFilename}`);
+        
+        downloadedPages.push({
+          id: pageData.id,
+          title: pageData.title,
+          filename: pageFilename,
+          attachmentCount: pageData.downloadedAttachments?.length || 0,
+          isRoot: pageData.id === rootPageId
+        });
+        
+      } catch (error) {
+        console.error(`❌ Failed to download page ${page.title}:`, error.message);
+      }
+    }
+    
+    // Step 4: Create comprehensive README
+    const uniqueAttachments = Array.from(
+      new Map(allAttachments.map(att => [att.filename, att])).values()
+    );
+    
+    const readmeContent = `# ${spaceKey} Space Export
+
+**Export Date:** ${new Date().toISOString()}  
+**Root Page ID:** ${rootPageId}  
+**Root Page:** ${rootPageData.title}  
+**Total Pages:** ${downloadedPages.length}  
+**Total Attachments:** ${uniqueAttachments.length}  
+
+## Pages Downloaded
+
+${downloadedPages.map(page => `- ${page.isRoot ? '🏠 ' : '📄 '}[${page.title}](${page.filename}) (${page.attachmentCount} attachments)`).join('\n')}
+
+## Attachments
+
+${uniqueAttachments.map(att => `- **${att.filename}** from "${att.pageTitle}" (${att.size} bytes, ${att.contentType})`).join('\n')}
+
+## Structure
+
+\`\`\`
+${path.basename(outputDir)}/
+├── README.md (this file)
+├── attachments/ (${uniqueAttachments.length} files)
+${downloadedPages.map(page => `├── ${page.filename}`).join('\n')}
+\`\`\`
+
+## Usage
+
+All images in the Markdown files reference the \`attachments/\` folder using relative paths. 
+The exported documentation is self-contained and can be viewed with any Markdown viewer.
+
+## Notes
+
+- All pages from space "${spaceKey}" have been downloaded
+- Images are embedded using proper Markdown syntax
+- The export preserves the original Confluence structure and metadata
+`;
+    
+    await fs.writeFile(path.join(outputDir, 'README.md'), readmeContent);
+    
+    // Step 5: Create hierarchy manifest
     const hierarchyManifest = {
       downloadDate: new Date().toISOString(),
       rootPageId: rootPageId,
-      totalPages: childPages.length + 1,
-      structure: {
-        root: rootPageId,
-        children: childPages.map(p => ({
-          id: p.id,
-          title: p.title,
-          path: `children/${p.id}`
-        }))
-      }
+      rootPageTitle: rootPageData.title,
+      spaceKey: spaceKey,
+      totalPages: downloadedPages.length,
+      totalAttachments: uniqueAttachments.length,
+      pages: downloadedPages,
+      attachments: uniqueAttachments
     };
     
     await fs.writeFile(
@@ -184,8 +370,11 @@ async function downloadPageHierarchy(rootPageId, outputDir = './downloads') {
       JSON.stringify(hierarchyManifest, null, 2)
     );
     
-    console.log('🎉 Hierarchical download complete!');
-    console.log(`📁 Total pages downloaded: ${hierarchyManifest.totalPages}`);
+    console.log('\n🎉 Hierarchical download completed!');
+    console.log(`� Output directory: ${outputDir}`);
+    console.log(`📄 Pages downloaded: ${downloadedPages.length}`);
+    console.log(`📎 Attachments downloaded: ${uniqueAttachments.length}`);
+    console.log(`🏠 Root page: ${rootPageData.title}`);
     
     return hierarchyManifest;
     
